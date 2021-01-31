@@ -44,7 +44,7 @@ Created by Frank Jiang
  ## Support Algorithm
  
  This machine learning web app currently supports most algorithm from the 'sklearn' library in Python as well as 
- some of the most commonly used algorithm such as Random Forest, Gradient Boosting, Extreme Gradient Boosting. 
+ some of the most commonly used algorithm such as Random Forest, Gradient Boosting, Extreme Gradient Boosting, SVM, Kmeans, Naive Bayes.  
  Deep Learning Algorithm 'keras', 'CNN', 'RNN' is currently under development.
  
  ## Model Deployment

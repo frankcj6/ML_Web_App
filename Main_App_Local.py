@@ -1,3 +1,4 @@
+import matplotlib
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,6 +9,7 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 import lightgbm as lgb
 from sklearn import metrics
+from sklearn import naive_bayes
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import cross_val_score
 from time import time
@@ -18,11 +20,13 @@ import seaborn as sns
 from mlxtend.plotting import plot_decision_regions
 import base64
 
+
 @st.cache(allow_output_mutation=True)
 def get_base64_of_bin_file(bin_file):
     with open(bin_file, 'rb') as f:
         data = f.read()
     return base64.b64encode(data).decode()
+
 
 def set_png_as_page_bg(png_file, sidebar_file):
     bin_str = get_base64_of_bin_file(png_file)
@@ -39,9 +43,8 @@ def set_png_as_page_bg(png_file, sidebar_file):
     st.markdown(page_bg_img, unsafe_allow_html=True)
     return
 
-set_png_as_page_bg('./ML Web App/static/background_4.jpg', './ML Web App/static/sidebar_3.jpg')
 
-
+set_png_as_page_bg('C:/ML Web App/static/background_4.jpg', 'C:/ML Web App/static/sidebar_3.jpg')
 
 st.title('Machine Learning Web App Beta Version')
 
@@ -62,7 +65,6 @@ with my_expander:
         st.write('Upload your datafile from here. ')
 target_var = st.sidebar.text_input('Clarify your target variable')
 
-
 my_expander = st.beta_expander('Target Variable Information')
 with my_expander:
     target = str(target_var)
@@ -78,14 +80,14 @@ with my_expander:
         st.write('Please Enter a valid variable name. ')
 
 classifier_name = st.sidebar.selectbox('Select Your Machine Learning Algorithm',
-                                       ('KNN', 'SVM', 'Random Forest', 'LightGBM', 'XGBoost'))
+                                       ('KNN', 'SVM', 'Random Forest', 'LightGBM', 'XGBoost', 'Naive Bayes'))
 
 
 def add_parameter(alg_name):
     params = dict()
     if alg_name == 'SVM':
         C = st.sidebar.slider('C', 0.1, 1.0)
-        kernel = st.sidebar.selectbox('kernel type', ['linear','rbf','poly'])
+        kernel = st.sidebar.selectbox('kernel type', ['linear', 'rbf', 'poly'])
         if kernel == 'rbf':
             Gamma = st.sidebar.slider('Gamma', 0.01, 1.0)
             params['gammas'] = Gamma
@@ -136,23 +138,61 @@ def add_parameter(alg_name):
         params['max_depth'] = max_depth
         params['objective'] = objective
         params['eval_metrics'] = eval_metrics
+    elif alg_name == 'Naive Bayes':
+        distribution = st.sidebar.selectbox('Please Select Your Algorithm',
+                                            ('Gaussian Naive Bayes', 'Multinomial Naive Bayes', 'Complement Naive Bayes'
+                                             , 'Bernoulli Naive Bayes', 'Categorical Naive Bayes'))
+        try:
+            feature_2 = x.columns.values
+            selected_feature_2 = st.multiselect('Select two features you are interested in', feature_2)
+            params['selected_feature_2'] = selected_feature_2
+        except:
+            pass
+
+        if distribution == 'Multinomial Naive Bayes':
+            alpha = st.sidebar.slider('alpha', 0.00, 1.00)
+            prior_bool = st.sidebar.selectbox('prior_bool', (True, False))
+            params['alpha'] = alpha
+            params['fit_prior'] = prior_bool
+        elif distribution == 'Complement Naive Bayes':
+            alpha = st.sidebar.slider('alpha', 0.00, 1.00)
+            prior_bool = st.sidebar.selectbox('prior_bool', (True, False))
+            norm_bool = st.sidebar.selectbox('norm_bool', (False, True))
+            params['alpha'] = alpha
+            params['fit_prior'] = prior_bool
+            params['norm'] = norm_bool
+        elif distribution == 'Bernoulli Naive Bayes':
+            alpha = st.sidebar.slider('alpha', 0.00, 1.00)
+            prior_bool = st.sidebar.selectbox('prior_bool', (True, False))
+            binarize_threshold = st.sidebar.selectbox('binary_threshold', (False, True))
+            params['binarize'] = binarize_threshold
+            if binarize_threshold == True:
+                threshold = st.sidebar.text_input('Identify your threshold')
+                params['binarize'] = threshold
+            params['alpha'] = alpha
+            params['fit_prior'] = prior_bool
+        elif distribution == 'Categorical Naive Bayes':
+            alpha = st.sidebar.slider('alpha', 0.00, 1.00)
+            prior_bool = st.sidebar.selectbox('prior_bool', (True, False))
+            params['alpha'] = alpha
+            params['fit_prior'] = prior_bool
+        params['distribution'] = distribution
+
     return params
 
 
 params = add_parameter(classifier_name)
 
 
-
-
 def model_build(alg_name, params):
     alg = None
     if alg_name == 'SVM':
-        if params['kernel']=='linear':
-            alg = SVC(C= params['C'], probability=True, kernel='linear')
+        if params['kernel'] == 'linear':
+            alg = SVC(C=params['C'], probability=True, kernel='linear')
         elif params['kernel'] == 'rbf':
-            alg = SVC(C= params['C'], gamma=params['gammas'], probability=True, kernel=params['kernel'])
+            alg = SVC(C=params['C'], gamma=params['gammas'], probability=True, kernel=params['kernel'])
         elif params['kernel'] == 'poly':
-            alg = SVC(C= params['C'], degree= params['degree'], probability=True, kernel=params['kernel'])
+            alg = SVC(C=params['C'], degree=params['degree'], probability=True, kernel=params['kernel'])
     elif alg_name == 'KNN':
         alg = KNeighborsClassifier(n_neighbors=params['K'], weights=params['weights'], leaf_size=params['leaf_size'])
     elif alg_name == 'Random Forest':
@@ -164,6 +204,18 @@ def model_build(alg_name, params):
     elif alg_name == 'XGBoost':
         alg = XGBClassifier(objective=params['objective'], eval_metrics=params['eval_metrics'],
                             learning_rate=params['learning_rate'], max_depth=params['max_depth'])
+    elif alg_name == 'Naive Bayes':
+        if params['distribution'] == 'Multinomial Naive Bayes':
+            alg = naive_bayes.MultinomialNB(alpha=params['alpha'], fit_prior=params['fit_prior'])
+        elif params['distribution'] == 'Gaussian Naive Bayes':
+            alg = naive_bayes.GaussianNB()
+        elif params['distribution'] == 'Complement Naive Bayes':
+            alg = naive_bayes.ComplementNB(alpha=params['alpha'], fit_prior=params['fit_prior'], norm=params['norm'])
+        elif params['distribution'] == 'Bernoulli Naive Bayes':
+            alg = naive_bayes.BernoulliNB(alpha=params['alpha'], fit_prior=params['fit_prior'],
+                                          binarize=params['binarize'])
+        elif params['distribution'] == 'Categorical Naive Bayes':
+            alg = naive_bayes.CategoricalNB(alpha=params['alpha'], fit_prior=params['fit_prior'])
     return alg
 
 
@@ -265,7 +317,6 @@ def plot_feature_importance(alg_name):
         plt.barh(range(len(indices)), importance[indices], color='b', align='center')
         plt.yticks(range(len(indices)), [features[i] for i in indices])
         plt.xlabel('Relative Importance')
-        plt.show()
 
     elif alg_name == 'KNN' or 'SVM':
         try:
@@ -288,7 +339,6 @@ def plot_feature_importance(alg_name):
                 plt.title('KNN Classifier with K=' + str(params['K']))
             else:
                 plt.title('SVM Classifier')
-            plt.show()
         except:
             pass
 
@@ -303,8 +353,17 @@ try:
     cols[1].pyplot(roc_graph)
     fig = plot_cm(y_test, pred)
     cols[0].pyplot(fig)
-    importance_plot = plot_feature_importance(classifier_name)
-    cols[1].pyplot(importance_plot)
-
+    if classifier_name == 'Naive Bayes':
+        x_ = x[[str(params['selected_feature_2'][0]), str(params['selected_feature_2'][1])]]
+        x_ = x_.to_numpy()
+        y_ = y.to_numpy()
+        plt.scatter(x_[:, 0], x_[:, 1], c=y_, s=50, cmap='RdBu')
+        plt.title('Naive Bayes Model', size=14)
+        plt.xlabel(str(params['selected_feature_2'][0]))
+        plt.ylabel(str(params['selected_feature_2'][1]))
+        cols[1].pyplot()
+    else:
+        importance_plot = plot_feature_importance(classifier_name)
+        cols[1].pyplot(importance_plot)
 except:
     pass
